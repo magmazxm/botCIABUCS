@@ -1,0 +1,6 @@
+{
+    "link": "https://prod.liveshare.vsengsaas.visualstudio.com/join/abcd1234",
+    "participants": ["Alice", "Bob"],
+    "start_time": "2025-10-04T10:15:00",
+    "end_time": null
+}
