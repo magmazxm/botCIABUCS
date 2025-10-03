@@ -1,25 +1,27 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 import json
 import os
 from dotenv import load_dotenv
 import asyncio
-from aiohttp import web # ไลบรารีที่จำเป็นสำหรับ Aiohttp Webhook Server
+from aiohttp import web
 import hmac
 import hashlib
+import time # เพิ่มไลบรารี time สำหรับจัดการเวลา
 
+# โหลด Environment Variables
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 DASHBOARD_CHANNEL_ID = int(os.getenv("DASHBOARD_CHANNEL_ID"))
-GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET") # โหลด Secret Key สำหรับ Webhook
+GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 
+# การตั้งค่า Bot
 intents = discord.Intents.default()
 intents.message_content = True
-
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# โหลดหรือเริ่มต้นข้อมูล Session
+# โหลดหรือเริ่มต้นข้อมูล Session จากไฟล์ session.json
 try:
     with open("session.json", "r") as f:
         session_data = json.load(f)
@@ -54,13 +56,18 @@ async def update_github_embed(payload, bot_client):
         branch = payload.get("ref", "unknown/ref").split("/")[-1] 
         last_commit = payload["head_commit"]["message"]
         author = payload["head_commit"]["author"]["name"]
+        commit_url = payload["head_commit"]["url"]
 
         embed.add_field(name="Repo", value=repo_name, inline=False)
         embed.add_field(name="Branch", value=branch, inline=True)
-        embed.add_field(name="Last commit", value=f"📝 {last_commit} by {author}", inline=True)
-        embed.add_field(name="PRs open", value="🔄 2", inline=True)
-        embed.add_field(name="Issues open", value="⚠️ 3", inline=True)
+        # เพิ่มลิงก์ไปยัง Commit
+        embed.add_field(name="Last Commit", value=f"[📝 {last_commit} by {author}]({commit_url})", inline=False)
+        
+        # Placeholders
+        embed.add_field(name="PRs Open", value="🔄 2", inline=True)
+        embed.add_field(name="Issues Open", value="⚠️ 3", inline=True)
 
+        # ปุ่มลิงก์ไปยัง Repository
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="View Repository", url=payload["repository"]["html_url"], style=discord.ButtonStyle.link))
         
@@ -91,7 +98,7 @@ async def handle_webhook(request):
         return web.Response(status=400, text="Invalid JSON")
 
     if event == "push" and payload.get("ref", "").startswith("refs/heads/"):
-        # รัน update_github_embed ใน background task
+        # รัน update_github_embed ใน background task พร้อมส่ง bot instance ไปด้วย
         asyncio.create_task(update_github_embed(payload, bot))
         print(f"Received and scheduled push event for repo {payload['repository']['name']}")
     else:
@@ -105,11 +112,9 @@ webhook_app.router.add_post("/webhook", handle_webhook)
 # -------- Aiohttp Server Startup Function --------
 async def start_webhook_server():
     """เริ่มต้น Aiohttp server บน PORT ที่กำหนดโดย environment variable"""
-    # ใช้ PORT จาก environment variable หรือใช้ 5000 เป็นค่า default
     port = int(os.environ.get("PORT", 5000))
     runner = web.AppRunner(webhook_app)
     await runner.setup()
-    # Bind ไปที่ 0.0.0.0 เพื่อให้ฟังทุก interface (สำคัญสำหรับ cloud hosting)
     site = web.TCPSite(runner, host='0.0.0.0', port=port) 
     
     print(f"🚀 Starting Aiohttp Webhook Server on 0.0.0.0:{port}...")
@@ -120,6 +125,7 @@ async def start_webhook_server():
 
 # -------- Helper Function (สำหรับ Commands) --------
 async def send_dm_only(user, message):
+    """ส่งข้อความ DM ไปหา user หากไม่สามารถส่งในช่องแชทได้"""
     try:
         await user.send(message)
     except:
@@ -133,9 +139,9 @@ async def on_ready():
     bot.loop.create_task(start_webhook_server())
 
 
-# -------- Commands --------
+# -------- Commands: Live Share Session --------
 @bot.command(name="session")
-async def session(ctx, action=None, link=None):
+async def session(ctx, action=None, *, link=None): # ใช้ *, link=None เพื่อรับลิงก์ที่มีช่องว่างได้
     if ctx.channel.id != DASHBOARD_CHANNEL_ID:
         await send_dm_only(ctx.author, "❌ คำสั่งนี้ใช้ได้เฉพาะช่อง #live-share-dashboard")
         return
@@ -146,50 +152,81 @@ async def session(ctx, action=None, link=None):
         if not link:
             await ctx.send("❌ โปรดใส่ลิงก์ Live Share")
             return
+            
+        # บันทึกข้อมูล
         session_data["link"] = link
-        session_data["participants"] = []
-        session_data["start_time"] = "10:00"  # placeholder
+        session_data["participants"] = [ctx.author.display_name] # ให้คนเริ่มเป็น Participant คนแรก
+        session_data["start_time"] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) # ใช้เวลาจริง
         session_data["end_time"] = None
         with open("session.json", "w") as f:
             json.dump(session_data, f)
         
-        embed = discord.Embed(title="💻 VS Code Live Share Session",
+        # โพสต์ Embed (ตรวจสอบแล้วว่าโค้ดส่วนนี้ถูกต้อง)
+        embed = discord.Embed(title="💻 VS Code Live Share Session Started!",
+                              description="Session สำหรับทำงานร่วมกันได้เริ่มขึ้นแล้ว!",
                               color=0x3498db)
-        embed.add_field(name="Session Link", value=f"[🟦 กดตรงนี้]({link})", inline=False)
-        embed.add_field(name="ผู้เข้าร่วม", value="(ยังไม่มี)", inline=False)
-        embed.add_field(name="เริ่ม", value=session_data["start_time"], inline=True)
-        embed.add_field(name="สิ้นสุด", value="-", inline=True)
-        embed.add_field(name="ระยะเวลา", value="-", inline=True)
-        await channel.send(embed=embed)
+        embed.add_field(name="Session Link", value=f"[🟦 กดตรงนี้เพื่อเข้าร่วม]({link})", inline=False)
+        embed.add_field(name="ผู้เริ่ม Session", value=ctx.author.display_name, inline=True)
+        embed.add_field(name="เวลาเริ่ม", value=session_data["start_time"], inline=True)
+        embed.add_field(name="ผู้เข้าร่วมปัจจุบัน", value=", ".join(session_data["participants"]), inline=False)
 
+        await channel.send(embed=embed)
+        await ctx.message.delete() # ลบข้อความคำสั่ง !session start เพื่อความสะอาด
+        
     elif action == "status":
-        embed = discord.Embed(title="💻 VS Code Live Share Session",
-                              color=0x3498db)
+        if not session_data.get("link"):
+            await ctx.send("⚠️ ขณะนี้ไม่มี Live Share Session ที่กำลังทำงานอยู่")
+            return
+
+        embed = discord.Embed(title="💻 VS Code Live Share Session Status",
+                              description="สถานะปัจจุบันของ Session ที่กำลังใช้งาน",
+                              color=0xf39c12)
         embed.add_field(name="Session Link", value=f"[🟦 กดตรงนี้]({session_data.get('link','-')})", inline=False)
+        embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
+        embed.add_field(name="สิ้นสุด", value="N/A", inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ยังไม่มี)", inline=False)
-        embed.add_field(name="เริ่ม", value=session_data.get("start_time","-"), inline=True)
-        embed.add_field(name="สิ้นสุด", value=session_data.get("end_time","-"), inline=True)
-        embed.add_field(name="ระยะเวลา", value="-", inline=True)
+        
         await channel.send(embed=embed)
 
     elif action == "end":
-        session_data["end_time"] = "11:23"  # placeholder
-        # ระยะเวลาคำนวณง่าย ๆ
-        embed = discord.Embed(title="💻 Live Share Session Ended",
-                              color=0xe74c3c)
-        embed.add_field(name="Session Link", value=f"[🟦 กดตรงนี้]({session_data.get('link','-')})", inline=False)
-        embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ยังไม่มี)", inline=False)
-        embed.add_field(name="เริ่ม", value=session_data.get("start_time","-"), inline=True)
-        embed.add_field(name="สิ้นสุด", value=session_data.get("end_time","-"), inline=True)
-        embed.add_field(name="ระยะเวลา", value="1 ชั่วโมง 23 นาที", inline=True)
-        await channel.send(embed=embed)
+        if not session_data.get("link"):
+            await ctx.send("⚠️ ไม่มี Live Share Session ที่จะให้ปิด")
+            return
+            
+        end_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        session_data["end_time"] = end_time_str
+        
+        # คำนวณระยะเวลา (อย่างง่าย)
+        try:
+            start_t = time.mktime(time.strptime(session_data["start_time"], "%Y-%m-%d %H:%M:%S"))
+            end_t = time.mktime(time.strptime(end_time_str, "%Y-%m-%d %H:%M:%S"))
+            duration_sec = end_t - start_t
+            hours = int(duration_sec // 3600)
+            minutes = int((duration_sec % 3600) // 60)
+            duration_text = f"{hours} ชั่วโมง {minutes} นาที"
+        except:
+            duration_text = "-"
 
+        embed = discord.Embed(title="💻 Live Share Session Ended",
+                              description="Session สิ้นสุดลงแล้ว ขอขอบคุณที่เข้าร่วม!",
+                              color=0xe74c3c)
+        embed.add_field(name="Session Link", value=f"[🟦 ลิงก์ Session ที่ผ่านมา]({session_data.get('link','-')})", inline=False)
+        embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
+        embed.add_field(name="เวลาสิ้นสุด", value=session_data.get("end_time","-"), inline=True)
+        embed.add_field(name="ระยะเวลา", value=duration_text, inline=True)
+        embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ไม่มี)", inline=False)
+        
+        await channel.send(embed=embed)
+        
+        # ล้างข้อมูล Session
         session_data.clear()
         with open("session.json", "w") as f:
             json.dump(session_data, f)
+        await ctx.message.delete()
 
     else:
-        await send_dm_only(ctx.author, "❌ โปรดใช้คำสั่ง: !session start/status/end <link>")
+        # ข้อความแจ้งเตือนคำสั่งที่ไม่ถูกต้อง (ส่งเป็น DM)
+        await send_dm_only(ctx.author, "❌ โปรดใช้คำสั่ง: !session start <link> | !session status | !session end")
 
 # -------- Run Bot --------
 bot.run(TOKEN)
