@@ -20,11 +20,9 @@ GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 # การตั้งค่า Bot
 intents = discord.Intents.default()
 intents.message_content = True 
-# เปลี่ยน command_prefix เป็น ! หรือลบออกไปเลย เพราะเราจะใช้ Slash Commands แทน
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-# สร้าง Command Tree (จำเป็นสำหรับ Slash Commands)
-bot.tree = app_commands.CommandTree(bot)
+# กำหนด Prefix เป็น '!' หรืออะไรก็ได้ที่ไม่ใช่ '/' เนื่องจากเราใช้ Slash Commands หลัก
+# Discord.py จะสร้าง bot.tree ให้เองโดยอัตโนมัติ
+bot = commands.Bot(command_prefix="!", intents=intents) 
 
 # โหลดหรือเริ่มต้นข้อมูล Session จากไฟล์ session.json
 try:
@@ -65,14 +63,11 @@ async def update_github_embed(payload, bot_client):
 
         embed.add_field(name="Repo", value=repo_name, inline=False)
         embed.add_field(name="Branch", value=branch, inline=True)
-        # เพิ่มลิงก์ไปยัง Commit
         embed.add_field(name="Last Commit", value=f"[📝 {last_commit} by {author}]({commit_url})", inline=False)
         
-        # Placeholders
         embed.add_field(name="PRs Open", value="🔄 2", inline=True)
         embed.add_field(name="Issues Open", value="⚠️ 3", inline=True)
 
-        # ปุ่มลิงก์ไปยัง Repository
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="View Repository", url=payload["repository"]["html_url"], style=discord.ButtonStyle.link))
         
@@ -103,7 +98,6 @@ async def handle_webhook(request):
         return web.Response(status=400, text="Invalid JSON")
 
     if event == "push" and payload.get("ref", "").startswith("refs/heads/"):
-        # รัน update_github_embed ใน background task พร้อมส่ง bot instance ไปด้วย
         asyncio.create_task(update_github_embed(payload, bot))
         print(f"Received and scheduled push event for repo {payload['repository']['name']}")
     else:
@@ -143,7 +137,8 @@ async def on_ready():
     
     # *** ส่วนสำคัญ: การลงทะเบียน Slash Commands ***
     try:
-        synced = await bot.tree.sync() # สั่งให้ Bot ลงทะเบียนคำสั่งทั้งหมดกับ Discord API
+        # bot.tree ถูกสร้างอัตโนมัติแล้ว เพียงแค่เรียก sync
+        synced = await bot.tree.sync() 
         print(f"✨ Synced {len(synced)} global command(s).")
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
@@ -154,7 +149,6 @@ async def on_ready():
 
 
 # --- Class สำหรับ Options ของ /session ---
-# กำหนดทางเลือกที่ผู้ใช้สามารถเลือกได้สำหรับพารามิเตอร์ 'action'
 class SessionAction(discord.app_commands.Choice):
     def __init__(self, name: str, value: str):
         super().__init__(name=name, value=value)
@@ -171,16 +165,12 @@ class SessionAction(discord.app_commands.Choice):
     SessionAction(name="ปิด Session และคำนวณเวลา", value="end")
 ])
 async def session_command(interaction: discord.Interaction, action: str, link: str = None):
-    # **ข้อสำคัญ: ใช้ interaction.channel.id แทน ctx.channel.id**
+    # ตรวจสอบ Channel ID
     if interaction.channel_id != DASHBOARD_CHANNEL_ID:
-        # ใช้ interaction.response.send_message เพื่อตอบกลับแบบ In-App Reply
         await interaction.response.send_message("❌ คำสั่งนี้ใช้ได้เฉพาะช่อง #live-share-dashboard เท่านั้น", ephemeral=True)
         return
 
-    # **ข้อสำคัญ: ใช้ interaction.response.defer() เพื่อตอบกลับทันที (ถ้าใช้เวลานานกว่า 3 วินาที)**
-    # ในกรณีนี้เราอาจจะตอบกลับเลยโดยไม่ต้อง defer ก็ได้ หรือจะ defer ไว้ก่อนแล้วค่อย follow up
-
-    channel = bot.get_channel(DASHBOARD_CHANNEL_ID) # ยังคงใช้ channel เพื่อส่งข้อความ Embed หลัก
+    channel = bot.get_channel(DASHBOARD_CHANNEL_ID)
 
     if action == "start":
         if not link:
@@ -189,7 +179,6 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
             
         # บันทึกข้อมูล
         session_data["link"] = link
-        # **ข้อสำคัญ: ใช้ interaction.user.display_name แทน ctx.author.display_name**
         session_data["participants"] = [interaction.user.display_name] 
         session_data["start_time"] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         session_data["end_time"] = None
@@ -205,10 +194,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         embed.add_field(name="เวลาเริ่ม", value=session_data["start_time"], inline=True)
         embed.add_field(name="ผู้เข้าร่วมปัจจุบัน", value=", ".join(session_data["participants"]), inline=False)
 
-        # เนื่องจากต้องการให้ Embed เป็นข้อความหลักในช่องแชท
-        # เราจะตอบกลับ Slash Command ด้วยข้อความสั้นๆ Ephemeral ก่อน
         await interaction.response.send_message("✅ เริ่ม Session แล้ว!", ephemeral=True)
-        # แล้วส่ง Embed ตามมาเป็นข้อความปกติ (Follow up)
         await channel.send(embed=embed)
         
     elif action == "status":
@@ -224,7 +210,6 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         embed.add_field(name="สิ้นสุด", value="N/A", inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ยังไม่มี)", inline=False)
         
-        # ตอบกลับด้วย Embed โดยตรง
         await interaction.response.send_message(embed=embed)
 
     elif action == "end":
@@ -260,12 +245,9 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         with open("session.json", "w") as f:
             json.dump(session_data, f)
         
-        # ตอบกลับ Slash Command ด้วยข้อความสั้นๆ Ephemeral ก่อน
         await interaction.response.send_message("✅ ปิด Session เรียบร้อยแล้ว!", ephemeral=True)
-        # แล้วส่ง Embed ตามมาเป็นข้อความปกติ
         await channel.send(embed=embed)
 
 
 # -------- Run Bot --------
 # bot.run(TOKEN)
-# ข้อควรจำ: โค้ดนี้ถูกแก้ไขเพื่อให้รองรับ Slash Commands และควรจะทำให้คำสั่ง /session ปรากฏขึ้นมาแนะนำ
