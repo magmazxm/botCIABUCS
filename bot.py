@@ -20,8 +20,8 @@ GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 # การตั้งค่า Bot
 intents = discord.Intents.default()
 intents.message_content = True 
-# กำหนด Prefix เป็น '!' เพื่อหลีกเลี่ยงความสับสนกับ Slash Command '/'
-# bot.tree (Command Tree) จะถูกสร้างโดยอัตโนมัติ
+# กำหนด Prefix เป็น '!' หรืออะไรก็ได้ที่ไม่ใช่ '/'
+# bot.tree (Command Tree) จะถูกสร้างโดยอัตโนมัติเมื่อสร้าง commands.Bot
 bot = commands.Bot(command_prefix="!", intents=intents) 
 
 # โหลดหรือเริ่มต้นข้อมูล Session จากไฟล์ session.json
@@ -31,7 +31,9 @@ try:
 except FileNotFoundError:
     session_data = {}
 
-# -------- Webhook Helper Functions (ฟังก์ชันสำหรับ GitHub Webhook) --------
+# --------------------------------------------------------------------------------
+# Webhook Helper Functions (ฟังก์ชันสำหรับ GitHub Webhook)
+# --------------------------------------------------------------------------------
 
 def verify_signature(request_body, signature):
     """ตรวจสอบลายเซ็นของ GitHub webhook เพื่อยืนยันความถูกต้องของ request"""
@@ -77,7 +79,9 @@ async def update_github_embed(payload, bot_client):
     except Exception as e:
         print(f"Error processing or sending GitHub embed: {e}")
 
-# -------- Aiohttp application setup --------
+# --------------------------------------------------------------------------------
+# Aiohttp application setup
+# --------------------------------------------------------------------------------
 webhook_app = web.Application()
 
 async def handle_webhook(request):
@@ -130,7 +134,9 @@ async def send_dm_only(user, message):
     except:
         print(f"Cannot send DM to {user}")
 
-# -------- Events --------
+# --------------------------------------------------------------------------------
+# Events and Command Sync
+# --------------------------------------------------------------------------------
 @bot.event
 async def on_ready():
     print(f'🤖 Logged in as {bot.user} (ID: {bot.user.id})')
@@ -147,80 +153,96 @@ async def on_ready():
     bot.loop.create_task(start_webhook_server())
 
 
+# --------------------------------------------------------------------------------
+# Slash Command: /session
+# --------------------------------------------------------------------------------
+
 # --- Class สำหรับ Options ของ /session ---
 class SessionAction(discord.app_commands.Choice):
     def __init__(self, name: str, value: str):
         super().__init__(name=name, value=value)
 
 # กำหนด Slash Command Group
-@bot.tree.command(name="session", description="จัดการ Live Share Session ในช่องทำงานเป็นทีม")
+@bot.tree.command(name="session", description="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> จัดการ Live Share Session ในช่องทำงานเป็นทีม")
 @app_commands.describe(
     action="เลือกคำสั่ง: start, status หรือ end",
     link="ลิงก์ Live Share (ใช้เฉพาะกับ action: start)",
 )
 @app_commands.choices(action=[
-    SessionAction(name="เริ่ม Live Share Session", value="start"),
-    SessionAction(name="แสดงสถานะ Session ปัจจุบัน", value="status"),
-    SessionAction(name="ปิด Session และคำนวณเวลา", value="end")
+    SessionAction(name="▶️ เริ่ม Live Share Session", value="start"),
+    SessionAction(name="ℹ️ แสดงสถานะ Session ปัจจุบัน", value="status"),
+    SessionAction(name="⏹️ ปิด Session และคำนวณเวลา", value="end")
 ])
 async def session_command(interaction: discord.Interaction, action: str, link: str = None):
-    # ตรวจสอบ Channel ID
+    
+    # ดึงชื่อผู้ใช้
+    user_name = interaction.user.display_name 
+
+    # 1. ตรวจสอบ Channel ID
     if interaction.channel_id != DASHBOARD_CHANNEL_ID:
-        # ephemeral=True คือการส่งข้อความตอบกลับที่เห็นเฉพาะผู้พิมพ์เท่านั้น
-        await interaction.response.send_message("❌ คำสั่งนี้ใช้ได้เฉพาะช่อง #live-share-dashboard เท่านั้น", ephemeral=True)
+        await interaction.response.send_message("<a:809832006988988486:1423939345026388008> คำสั่งนี้ใช้ได้เฉพาะช่อง #live-share-dashboard เท่านั้น", ephemeral=True)
         return
 
     channel = bot.get_channel(DASHBOARD_CHANNEL_ID)
 
     if action == "start":
         if not link:
-            await interaction.response.send_message("❌ โปรดใส่ลิงก์ Live Share เมื่อใช้ /session start", ephemeral=True)
+            await interaction.response.send_message("<a:809832006988988486:1423939345026388008> โปรดใส่ลิงก์ Live Share เมื่อใช้ /session start", ephemeral=True)
             return
             
-        # บันทึกข้อมูล
+        # 2. บันทึกข้อมูล
         session_data["link"] = link
-        session_data["participants"] = [interaction.user.display_name] 
+        session_data["participants"] = [user_name] 
         session_data["start_time"] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         session_data["end_time"] = None
         with open("session.json", "w") as f:
             json.dump(session_data, f)
         
-        # โพสต์ Embed
-        embed = discord.Embed(title="💻 VS Code Live Share Session Started!",
-                              description="Session สำหรับทำงานร่วมกันได้เริ่มขึ้นแล้ว!",
+        # *** ข้อความ Ephemeral ยืนยันการเริ่ม Session (เห็นเฉพาะผู้ใช้) ***
+        ephemeral_message = (
+            f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506:> **Session STARTED!**\n"
+            f"**โฮสต์:** {user_name} (คุณ)\n"
+            f"**ลิงก์:** {link}\n\n"
+            f"โพสต์สาธารณะถูกส่งในช่องแล้ว"
+        )
+        await interaction.response.send_message(ephemeral_message, ephemeral=True)
+
+        # 3. สร้างและโพสต์ Embed (ข้อความสาธารณะ)
+        embed = discord.Embed(title="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! <a:1423939328928780338:67c3e29969174247b000f7c7318660f>",
+                              description="Session สำหรับทำงานร่วมกันได้เริ่มขึ้นแล้ว! กดลิงก์เพื่อเข้าร่วม",
                               color=0x3498db)
-        embed.add_field(name="Session Link", value=f"[🟦 กดตรงนี้เพื่อเข้าร่วม]({link})", inline=False)
-        embed.add_field(name="ผู้เริ่ม Session", value=interaction.user.display_name, inline=True)
+        embed.add_field(name="Session Link", value=f"[<a:138303skullz:1423938938913165385> กดตรงนี้เพื่อเข้าร่วม]({link})", inline=False)
+        embed.add_field(name="ผู้เริ่ม Session", value=user_name, inline=True)
         embed.add_field(name="เวลาเริ่ม", value=session_data["start_time"], inline=True)
         embed.add_field(name="ผู้เข้าร่วมปัจจุบัน", value=", ".join(session_data["participants"]), inline=False)
-
-        await interaction.response.send_message("✅ เริ่ม Session แล้ว!", ephemeral=True)
+        
         await channel.send(embed=embed)
         
     elif action == "status":
         if not session_data.get("link"):
-            await interaction.response.send_message("⚠️ ขณะนี้ไม่มี Live Share Session ที่กำลังทำงานอยู่", ephemeral=True)
+            await interaction.response.send_message("<a:809832006988988486:1423939345026388008> ขณะนี้ไม่มี Live Share Session ที่กำลังทำงานอยู่", ephemeral=True)
             return
 
-        embed = discord.Embed(title="💻 VS Code Live Share Session Status",
-                              description="สถานะปัจจุบันของ Session ที่กำลังใช้งาน",
+        # 1. สร้าง Embed แสดงสถานะ (Ephemeral)
+        embed = discord.Embed(title="<a:1249347622158860308:1422185419491246101> VS Code Live Share Session Status",
+                              description=f"สถานะปัจจุบันของ Session (สำหรับ {user_name})",
                               color=0xf39c12)
-        embed.add_field(name="Session Link", value=f"[🟦 กดตรงนี้]({session_data.get('link','-')})", inline=False)
+        embed.add_field(name="Session Link", value=f"[<a:138303skullz:1423938938913165385> กดตรงนี้]({session_data.get('link','-')})", inline=False)
         embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
         embed.add_field(name="สิ้นสุด", value="N/A", inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ยังไม่มี)", inline=False)
         
-        await interaction.response.send_message(embed=embed)
+        # 2. ตอบกลับด้วย Embed (Ephemeral)
+        await interaction.response.send_message(embed=embed, ephemeral=True) 
 
     elif action == "end":
         if not session_data.get("link"):
-            await interaction.response.send_message("⚠️ ไม่มี Live Share Session ที่จะให้ปิด", ephemeral=True)
+            await interaction.response.send_message("❌ ไม่มี Live Share Session ที่จะให้ปิด", ephemeral=True)
             return
             
         end_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-        session_data["end_time"] = end_time_str
         
-        # คำนวณระยะเวลา (อย่างง่าย)
+        # 1. คำนวณระยะเวลา
         try:
             start_t = time.mktime(time.strptime(session_data["start_time"], "%Y-%m-%d %H:%M:%S"))
             end_t = time.mktime(time.strptime(end_time_str, "%Y-%m-%d %H:%M:%S"))
@@ -230,25 +252,34 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
             duration_text = f"{hours} ชั่วโมง {minutes} นาที"
         except:
             duration_text = "-"
-
-        embed = discord.Embed(title="💻 Live Share Session Ended",
-                              description="Session สิ้นสุดลงแล้ว ขอขอบคุณที่เข้าร่วม!",
-                              color=0xe74c3c)
-        embed.add_field(name="Session Link", value=f"[🟦 ลิงก์ Session ที่ผ่านมา]({session_data.get('link','-')})", inline=False)
-        embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
-        embed.add_field(name="เวลาสิ้นสุด", value=session_data.get("end_time","-"), inline=True)
-        embed.add_field(name="ระยะเวลา", value=duration_text, inline=True)
-        embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ไม่มี)", inline=False)
         
-        # ล้างข้อมูล Session
+        # 2. ล้างข้อมูล Session
         session_data.clear()
         with open("session.json", "w") as f:
             json.dump(session_data, f)
         
-        await interaction.response.send_message("✅ ปิด Session เรียบร้อยแล้ว!", ephemeral=True)
+        # *** ข้อความ Ephemeral ยืนยันการปิด Session (เห็นเฉพาะผู้ใช้) ***
+        ephemeral_message = (
+            f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506:> **Session ENDED!**\n"
+            f"Session ถูกปิดโดย: {user_name} (คุณ)\n"
+            f"โพสต์สรุปถูกส่งในช่องแล้ว"
+        )
+        await interaction.response.send_message(ephemeral_message, ephemeral=True)
+
+        # 3. สร้าง Embed สรุป (ข้อความสาธารณะ)
+        embed = discord.Embed(title="<a:810020134865338368:1423938901671804968:> Live Share Session Ended",
+                              description="Session สิ้นสุดลงแล้ว ขอขอบคุณที่เข้าร่วม!",
+                              color=0xe74c3c)
+        embed.add_field(name="Session Link", value=f"[<a:138303skullz:1423938938913165385> ลิงก์ Session ที่ผ่านมา]({session_data.get('link','-')})", inline=False)
+        embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
+        embed.add_field(name="เวลาสิ้นสุด", value=end_time_str, inline=True)
+        embed.add_field(name="ระยะเวลา", value=duration_text, inline=True)
+        embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ไม่มี)", inline=False)
+
         await channel.send(embed=embed)
 
 
-# -------- Run Bot --------
-# *** บรรทัดนี้สำคัญมาก! ทำให้บอทออนไลน์ได้ ***
+# --------------------------------------------------------------------------------
+# Run Bot
+# --------------------------------------------------------------------------------
 bot.run(TOKEN)
