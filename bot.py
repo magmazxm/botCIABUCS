@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from discord import app_commands # นำเข้า app_commands เพื่อใช้ Slash Commands
+from discord import app_commands 
 import json
 import os
 from dotenv import load_dotenv
@@ -20,8 +20,8 @@ GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 # การตั้งค่า Bot
 intents = discord.Intents.default()
 intents.message_content = True 
-# กำหนด Prefix เป็น '!' หรืออะไรก็ได้ที่ไม่ใช่ '/' เนื่องจากเราใช้ Slash Commands หลัก
-# Discord.py จะสร้าง bot.tree ให้เองโดยอัตโนมัติ
+# กำหนด Prefix เป็น '!' เพื่อหลีกเลี่ยงความสับสนกับ Slash Command '/'
+# bot.tree (Command Tree) จะถูกสร้างโดยอัตโนมัติ
 bot = commands.Bot(command_prefix="!", intents=intents) 
 
 # โหลดหรือเริ่มต้นข้อมูล Session จากไฟล์ session.json
@@ -135,9 +135,8 @@ async def send_dm_only(user, message):
 async def on_ready():
     print(f'🤖 Logged in as {bot.user} (ID: {bot.user.id})')
     
-    # *** ส่วนสำคัญ: การลงทะเบียน Slash Commands ***
+    # *** ส่วนสำคัญ: การลงทะเบียน Slash Commands (Sync) ***
     try:
-        # bot.tree ถูกสร้างอัตโนมัติแล้ว เพียงแค่เรียก sync
         synced = await bot.tree.sync() 
         print(f"✨ Synced {len(synced)} global command(s).")
     except Exception as e:
@@ -167,6 +166,7 @@ class SessionAction(discord.app_commands.Choice):
 async def session_command(interaction: discord.Interaction, action: str, link: str = None):
     # ตรวจสอบ Channel ID
     if interaction.channel_id != DASHBOARD_CHANNEL_ID:
+        # ephemeral=True คือการส่งข้อความตอบกลับที่เห็นเฉพาะผู้พิมพ์เท่านั้น
         await interaction.response.send_message("❌ คำสั่งนี้ใช้ได้เฉพาะช่อง #live-share-dashboard เท่านั้น", ephemeral=True)
         return
 
@@ -250,4 +250,5 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
 
 
 # -------- Run Bot --------
-# bot.run(TOKEN)
+# *** บรรทัดนี้สำคัญมาก! ทำให้บอทออนไลน์ได้ ***
+bot.run(TOKEN)
