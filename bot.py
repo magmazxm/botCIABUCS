@@ -163,6 +163,7 @@ class SessionAction(discord.app_commands.Choice):
         super().__init__(name=name, value=value)
 
 # กำหนด Slash Command Group
+# ใช้อิโมจิ: <a:67c3e29969174247b000f7c7318660f:1423939328928780338>
 @bot.tree.command(name="session", description="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> จัดการ Live Share Session ในช่องทำงานเป็นทีม")
 @app_commands.describe(
     action="เลือกคำสั่ง: start, status หรือ end",
@@ -179,6 +180,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
     user_name = interaction.user.display_name 
 
     # 1. ตรวจสอบ Channel ID
+    # ใช้อิโมจิ: <a:809832006988988486:1423939345026388008>
     if interaction.channel_id != DASHBOARD_CHANNEL_ID:
         await interaction.response.send_message("<a:809832006988988486:1423939345026388008> คำสั่งนี้ใช้ได้เฉพาะช่อง #live-share-dashboard เท่านั้น", ephemeral=True)
         return
@@ -187,6 +189,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
 
     if action == "start":
         if not link:
+            # ใช้อิโมจิ: <a:809832006988988486:1423939345026388008>
             await interaction.response.send_message("<a:809832006988988486:1423939345026388008> โปรดใส่ลิงก์ Live Share เมื่อใช้ /session start", ephemeral=True)
             return
             
@@ -199,6 +202,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
             json.dump(session_data, f)
         
         # *** ข้อความ Ephemeral ยืนยันการเริ่ม Session (เห็นเฉพาะผู้ใช้) ***
+        # ใช้อิโมจิ: <a:45696190630e4f208144d0582a0b0414:1423939335928938506:>
         ephemeral_message = (
             f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506:> **Session STARTED!**\n"
             f"**โฮสต์:** {user_name} (คุณ)\n"
@@ -208,9 +212,11 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         await interaction.response.send_message(ephemeral_message, ephemeral=True)
 
         # 3. สร้างและโพสต์ Embed (ข้อความสาธารณะ)
-        embed = discord.Embed(title="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! <a:1423939328928780338:67c3e29969174247b000f7c7318660f>",
+        # ใช้อิโมจิ: <a:67c3e29969174247b000f7c7318660f:1423939328928780338>
+        embed = discord.Embed(title="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! 🚀",
                               description="Session สำหรับทำงานร่วมกันได้เริ่มขึ้นแล้ว! กดลิงก์เพื่อเข้าร่วม",
                               color=0x3498db)
+        # ใช้อิโมจิ: <a:138303skullz:1423938938913165385>
         embed.add_field(name="Session Link", value=f"[<a:138303skullz:1423938938913165385> กดตรงนี้เพื่อเข้าร่วม]({link})", inline=False)
         embed.add_field(name="ผู้เริ่ม Session", value=user_name, inline=True)
         embed.add_field(name="เวลาเริ่ม", value=session_data["start_time"], inline=True)
@@ -219,14 +225,17 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         await channel.send(embed=embed)
         
     elif action == "status":
+        # ใช้อิโมจิ: <a:809832006988988486:1423939345026388008>
         if not session_data.get("link"):
             await interaction.response.send_message("<a:809832006988988486:1423939345026388008> ขณะนี้ไม่มี Live Share Session ที่กำลังทำงานอยู่", ephemeral=True)
             return
 
         # 1. สร้าง Embed แสดงสถานะ (Ephemeral)
+        # ใช้อิโมจิ: <a:1249347622158860308:1422185419491246101>
         embed = discord.Embed(title="<a:1249347622158860308:1422185419491246101> VS Code Live Share Session Status",
                               description=f"สถานะปัจจุบันของ Session (สำหรับ {user_name})",
                               color=0xf39c12)
+        # ใช้อิโมจิ: <a:138303skullz:1423938938913165385>
         embed.add_field(name="Session Link", value=f"[<a:138303skullz:1423938938913165385> กดตรงนี้]({session_data.get('link','-')})", inline=False)
         embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
         embed.add_field(name="สิ้นสุด", value="N/A", inline=True)
@@ -236,13 +245,14 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         await interaction.response.send_message(embed=embed, ephemeral=True) 
 
     elif action == "end":
+        # ใช้อิโมจิ: ❌
         if not session_data.get("link"):
             await interaction.response.send_message("❌ ไม่มี Live Share Session ที่จะให้ปิด", ephemeral=True)
             return
             
         end_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         
-        # 1. คำนวณระยะเวลา
+        # 1. คำนวณระยะเวลา (โค้ดคำนวณเหมือนเดิม)
         try:
             start_t = time.mktime(time.strptime(session_data["start_time"], "%Y-%m-%d %H:%M:%S"))
             end_t = time.mktime(time.strptime(end_time_str, "%Y-%m-%d %H:%M:%S"))
@@ -259,6 +269,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
             json.dump(session_data, f)
         
         # *** ข้อความ Ephemeral ยืนยันการปิด Session (เห็นเฉพาะผู้ใช้) ***
+        # ใช้อิโมจิ: <a:45696190630e4f208144d0582a0b0414:1423939335928938506:>
         ephemeral_message = (
             f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506:> **Session ENDED!**\n"
             f"Session ถูกปิดโดย: {user_name} (คุณ)\n"
@@ -267,9 +278,11 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         await interaction.response.send_message(ephemeral_message, ephemeral=True)
 
         # 3. สร้าง Embed สรุป (ข้อความสาธารณะ)
+        # ใช้อิโมจิ: <a:810020134865338368:1423938901671804968:>
         embed = discord.Embed(title="<a:810020134865338368:1423938901671804968:> Live Share Session Ended",
                               description="Session สิ้นสุดลงแล้ว ขอขอบคุณที่เข้าร่วม!",
                               color=0xe74c3c)
+        # ใช้อิโมจิ: <a:138303skullz:1423938938913165385>
         embed.add_field(name="Session Link", value=f"[<a:138303skullz:1423938938913165385> ลิงก์ Session ที่ผ่านมา]({session_data.get('link','-')})", inline=False)
         embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
         embed.add_field(name="เวลาสิ้นสุด", value=end_time_str, inline=True)
