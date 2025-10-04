@@ -264,7 +264,7 @@ class SessionAction(discord.app_commands.Choice):
         super().__init__(name=name, value=value)
 
 # กำหนด Slash Command Group
-@bot.tree.command(name="session", description="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> จัดการ Live Share Session ในช่องทำงานเป็นทีม")
+@bot.tree.command(name="session", description="▶️ จัดการ Live Share Session ในช่องทำงานเป็นทีม")
 @app_commands.describe(
     action="เลือกคำสั่ง: start, status หรือ end",
     link="ลิงก์ Live Share (ใช้เฉพาะกับ action: start)",
