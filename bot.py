@@ -143,7 +143,7 @@ async def on_ready():
 
 
 # --------------------------------------------------------------------------------
-# Slash Command: /session (ส่วนที่ปรับปรุงปุ่มกด)
+# Slash Command: /session (ส่วนที่ปรับปรุงปุ่มกดและคง Emoji ดั้งเดิม)
 # --------------------------------------------------------------------------------
 
 # --- Class สำหรับ Options ของ /session ---
@@ -184,7 +184,6 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         session_data["participants"] = [user_name] 
         session_data["start_time"] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         session_data["end_time"] = None
-        # เก็บ ID ของข้อความ Embed ล่าสุด (ถ้ามี) เพื่อใช้แก้ไข/ลบในภายหลัง
         session_data["last_message_id"] = None 
         with open("session.json", "w") as f:
             json.dump(session_data, f)
@@ -207,8 +206,8 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         
         # *** สร้างปุ่มกดสีเขียว (Green Button) ***
         view = discord.ui.View()
-        # ใช้ Primary/Blurple แทน Red (เพื่อให้ดูน่ากดเข้า, ส่วน Red มักใช้สำหรับการลบ/อันตราย)
-        view.add_item(discord.ui.Button(label="🚀 เข้าร่วม Session (LIVE)", url=link, style=discord.ButtonStyle.green))
+        # เปลี่ยนเป็นสีเขียวตามที่คุณต้องการ
+        view.add_item(discord.ui.Button(label="🚀 เข้าร่วม Session (LIVE)", url=link, style=discord.ButtonStyle.green)) 
         
         sent_message = await channel.send(embed=embed, view=view)
         
@@ -224,7 +223,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
             return
 
         # 1. สร้าง Embed แสดงสถานะ (Ephemeral - ยังคงแสดงลิงก์เพื่อให้ผู้ใช้เช็คได้)
-        embed = discord.Embed(title="ℹ️ สถานะ Live Share Session ปัจจุบัน",
+        embed = discord.Embed(title="<a:1249347622158860308:1422185419491246101> สถานะ Live Share Session ปัจจุบัน",
                               description=f"<a:2a3404eb19f54b10b16e83768f5937ae:1423939322947829841> Session กำลังทำงานอยู่ (จัดการโดยคุณ: {user_name})",
                               color=0xf39c12)
         embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
@@ -243,7 +242,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
             return
             
         end_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-        current_link = session_data.get("link") # ดึงลิงก์เดิมก่อนล้างข้อมูล
+        current_link = session_data.get("link") 
         current_message_id = session_data.get("last_message_id")
         current_participants = session_data.get("participants", [])
         current_start_time = session_data.get("start_time", "-")
@@ -283,6 +282,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
 
         # *** สร้างปุ่มกดสีเทา (Secondary Button) สำหรับ Session ที่จบแล้ว ***
         view = discord.ui.View()
+        # เปลี่ยนเป็นสีเทา (Secondary) ตามที่คุณต้องการ
         view.add_item(discord.ui.Button(label="🔗 ลิงก์ Session ที่ผ่านมา", url=current_link, style=discord.ButtonStyle.secondary))
 
         await channel.send(embed=embed, view=view)
@@ -290,14 +290,12 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         # 4. ลบปุ่มออกจากข้อความ 'START' เดิม
         if current_message_id:
             try:
-                # โหลดข้อความเก่าที่โพสต์ตอน 'start'
                 old_message = await channel.fetch_message(current_message_id)
-                # สร้าง Embed ใหม่สำหรับแก้ไข (เพื่อให้ Embed เดิมไม่มีคำว่า LIVE)
                 old_embed = old_message.embeds[0]
-                old_embed.title = "💻 VS Code Live Share Session Started! (Finished)" 
+                old_embed.title = "<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! (Finished)" 
                 old_embed.description = "Session นี้สิ้นสุดลงแล้ว ดูสรุปด้านล่าง"
                 
-                # แก้ไขข้อความเดิมโดยลบปุ่มออก
+                # แก้ไขข้อความเดิมโดยลบปุ่มออก (view=None)
                 await old_message.edit(embed=old_embed, view=None) 
             except discord.NotFound:
                 print(f"Warning: Original START message with ID {current_message_id} not found for editing.")
