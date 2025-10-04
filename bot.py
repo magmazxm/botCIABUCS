@@ -204,7 +204,7 @@ class AnnouncementModal(discord.ui.Modal, title='📝 สร้างข้อ�
         embed = discord.Embed(
             title=f"{title}",
             description=description,
-            color=discord.Color.blue()
+            color=discord.Color.red()
         )
         embed.set_footer(text=f"ประกาศโดย: {interaction.user.display_name}",
                          icon_url=interaction.user.display_avatar.url)
