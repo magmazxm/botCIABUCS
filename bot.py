@@ -197,7 +197,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         await interaction.response.send_message(ephemeral_message, ephemeral=True)
 
         # 3. สร้างและโพสต์ Embed (ข้อความสาธารณะ)
-        embed = discord.Embed(title="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! 🚀",
+        embed = discord.Embed(title="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! <a:138303skullz:1423938938913165385>",
                               description="Session สำหรับทำงานร่วมกันได้เริ่มขึ้นแล้ว! กดปุ่มด้านล่างเพื่อเข้าร่วม",
                               color=0x3498db)
         embed.add_field(name="ผู้เริ่ม Session", value=user_name, inline=True)
@@ -207,7 +207,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         # *** สร้างปุ่มกดสีเขียว (Green Button) ***
         view = discord.ui.View()
         # เปลี่ยนเป็นสีเขียวตามที่คุณต้องการ
-        view.add_item(discord.ui.Button(label="🚀 เข้าร่วม Session (LIVE)", url=link, style=discord.ButtonStyle.green)) 
+        view.add_item(discord.ui.Button(label="<a:138303skullz:1423938938913165385> เข้าร่วม Session (LIVE)", url=link, style=discord.ButtonStyle.green)) 
         
         sent_message = await channel.send(embed=embed, view=view)
         
@@ -231,7 +231,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         
         # *** สร้างปุ่มกดสีเขียว (Green Button) สำหรับ Status ***
         view = discord.ui.View()
-        view.add_item(discord.ui.Button(label="🚀 ลิงก์ Session ปัจจุบัน", url=session_data.get('link','-'), style=discord.ButtonStyle.green))
+        view.add_item(discord.ui.Button(label="<a:138303skullz:1423938938913165385> ลิงก์ Session ปัจจุบัน", url=session_data.get('link','-'), style=discord.ButtonStyle.green))
 
         # 2. ตอบกลับด้วย Embed (Ephemeral)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True) 
