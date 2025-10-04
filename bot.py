@@ -14,16 +14,15 @@ import time
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
+# ************************************************
+# ⚠️ คุณต้องกำหนดค่าเหล่านี้ ⚠️
+# ************************************************
 DASHBOARD_CHANNEL_ID = int(os.getenv("DASHBOARD_CHANNEL_ID")) 
 GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 
-# ************************************************
-# ต้องกำหนด Role ID ที่นี่!
-# ************************************************
 # เปลี่ยนตัวเลขเหล่านี้เป็น ID ของบทบาทที่คุณต้องการให้ใช้คำสั่ง /announce ได้
-# เช่น [987654321098765432, 123456789012345678]
 ALLOWED_ANNOUNCER_ROLES = [
-    1423975320821829683
+    # ใส่ Role ID ที่ได้รับอนุญาตที่นี่ (ตัวเลขเท่านั้น)
 ]
 # ************************************************
 
@@ -40,11 +39,11 @@ except FileNotFoundError:
     session_data = {}
 
 # --------------------------------------------------------------------------------
-# Webhook และ Startup (คงเดิม)
+## GitHub Webhook Helper Functions
 # --------------------------------------------------------------------------------
 
 def verify_signature(request_body, signature):
-    # ... (ส่วนนี้คงเดิม)
+    """ตรวจสอบลายเซ็นของ GitHub webhook เพื่อยืนยันความถูกต้องของ request"""
     if not GITHUB_WEBHOOK_SECRET:
         print("ERROR: GITHUB_WEBHOOK_SECRET is not set.")
         return False
@@ -54,7 +53,7 @@ def verify_signature(request_body, signature):
     return hmac.compare_digest(expected, signature)
 
 async def update_github_embed(payload, bot_client):
-    # ... (ส่วนนี้คงเดิม)
+    """สร้างและส่ง Discord Embed สำหรับแจ้งเตือนสถานะ GitHub"""
     await bot_client.wait_until_ready()
     channel = bot_client.get_channel(DASHBOARD_CHANNEL_ID)
     
@@ -85,10 +84,13 @@ async def update_github_embed(payload, bot_client):
     except Exception as e:
         print(f"Error processing or sending GitHub embed: {e}")
 
+# --------------------------------------------------------------------------------
+## Aiohttp application setup (Webhook Server)
+# --------------------------------------------------------------------------------
 webhook_app = web.Application()
 
 async def handle_webhook(request):
-    # ... (ส่วนนี้คงเดิม)
+    """ฟังก์ชันหลักสำหรับจัดการ request ที่เข้ามาที่ /webhook"""
     body = await request.read()
     signature = request.headers.get("X-Hub-Signature-256")
     
@@ -112,10 +114,12 @@ async def handle_webhook(request):
 
     return web.Response(text="OK")
 
+# ผูก handler เข้ากับเส้นทาง /webhook
 webhook_app.router.add_post("/webhook", handle_webhook)
 
+# -------- Aiohttp Server Startup Function --------
 async def start_webhook_server():
-    # ... (ส่วนนี้คงเดิม)
+    """เริ่มต้น Aiohttp server บน PORT ที่กำหนดโดย environment variable"""
     port = int(os.environ.get("PORT", 5000))
     runner = web.AppRunner(webhook_app)
     await runner.setup()
@@ -127,19 +131,24 @@ async def start_webhook_server():
     except Exception as e:
         print(f"FATAL: Failed to start web server on port {port}. Error: {e}")
 
+# --------------------------------------------------------------------------------
+## Bot Events and Command Sync
+# --------------------------------------------------------------------------------
 @bot.event
 async def on_ready():
     print(f'🤖 Logged in as {bot.user} (ID: {bot.user.id})')
+    
     try:
         synced = await bot.tree.sync() 
         print(f"✨ Synced {len(synced)} global command(s).")
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
     
+    # เริ่ม Webhook server ให้ทำงานพร้อมกับ Bot
     bot.loop.create_task(start_webhook_server())
 
 # --------------------------------------------------------------------------------
-# NEW: Slash Command สำหรับประชาสัมพันธ์ (Modal) - พร้อมการตรวจสอบสิทธิ์
+## Slash Command: /announce (Public Post + Role Check)
 # --------------------------------------------------------------------------------
 
 # ฟังก์ชันตรวจสอบสิทธิ์ที่รวม is_owner และ has_any_role
@@ -150,14 +159,14 @@ def is_announcer(interaction: discord.Interaction) -> bool:
         return True
     
     # 2. ตรวจสอบว่ามีบทบาทที่กำหนดหรือไม่
-    if ALLOWED_ANNOUNCER_ROLES:
+    if ALLOWED_ANNOUNCER_ROLES and interaction.guild:
         user_role_ids = [role.id for role in interaction.user.roles]
         if any(role_id in user_role_ids for role_id in ALLOWED_ANNOUNCER_ROLES):
             return True
             
     return False
 
-# 1. สร้าง Modal Class (คงเดิม)
+# 1. สร้าง Modal Class
 class AnnouncementModal(discord.ui.Modal, title='📝 สร้างข้อความประชาสัมพันธ์'):
     
     # Text Input 1: Title (หัวเรื่อง)
@@ -172,14 +181,14 @@ class AnnouncementModal(discord.ui.Modal, title='📝 สร้างข้อ�
     description_input = discord.ui.TextInput(
         label='เนื้อหา (รองรับ Markdown)',
         placeholder='กรอกเนื้อหารายละเอียดทั้งหมดที่นี่...',
-        style=discord.TextStyle.paragraph, # ให้เป็นช่องใหญ่
+        style=discord.TextStyle.paragraph, 
         required=True
     )
 
     # Text Input 3: Image URL (ลิงก์รูปภาพ - ทางเลือก)
     image_url_input = discord.ui.TextInput(
         label='ลิงก์รูปภาพ (Image URL - ไม่บังคับ)',
-        placeholder='ต้องเป็นลิงก์ที่จบด้วย .png, .jpg, .gif เท่านั้น',
+        placeholder='ต้องเป็นลิงก์ที่จบด้วย .png, .jpg, .gif, .webp เท่านั้น (รองรับลิงก์ Discord)',
         max_length=2000,
         required=False
     )
@@ -192,12 +201,10 @@ class AnnouncementModal(discord.ui.Modal, title='📝 สร้างข้อ�
         
         # 1. สร้าง Embed
         embed = discord.Embed(
-            title=f"📢 {title}",
+            title=f"<a:torakong:1422185259042078770><a:torakong:1422185259042078770><a:torakong:1422185259042078770>  {title}",
             description=description,
             color=discord.Color.blue()
         )
-        
-        # เพิ่ม Footer 
         embed.set_footer(text=f"ประกาศโดย: {interaction.user.display_name}", 
                          icon_url=interaction.user.display_avatar.url)
         
@@ -207,21 +214,21 @@ class AnnouncementModal(discord.ui.Modal, title='📝 สร้างข้อ�
             embed.set_image(url=image_url)
             valid_image_url = True
 
-        # 3.1 ตอบสนอง (Defer) ไปก่อน เพื่อให้มีเวลาประมวลผล
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        # 3. การตอบกลับ:
+        # 3.1 ตอบกลับ Ephemeral เพื่อแจ้งว่ากำลังประมวลผล (ต้องทำเป็นอันดับแรก)
+        await interaction.response.send_message("<a:45696190630e4f208144d0582a0b0414:1423939335928938506> กำลังโพสต์ประชาสัมพันธ์สาธารณะ...", ephemeral=True)
         
-        # 3.2 สร้างข้อความ Ping Role
-        message_content = f"📢 ประกาศใหม่จาก **{interaction.user.display_name}**!"
-        # คุณอาจเปลี่ยน message_content เป็น "@everyone" หรือ "@here" ก็ได้
-
-        # 3.3 โพสต์ Embed สาธารณะ: ใช้ FOLLOWUP
+        # 3.2 ใช้ followup เพื่อส่งข้อความจริงแบบสาธารณะ
+        message_content = "@everyone" # Ping @everyone ให้ทุกคนเห็นแจ้งเตือน
+        
         await interaction.followup.send(content=message_content, embed=embed)
         
-        # 3.4 ส่งข้อความแจ้งเตือน (Ephemeral) ว่าสำเร็จแล้ว
-        success_message = "✅ โพสต์ประชาสัมพันธ์สำเร็จแล้ว!"
-        if image_url and not valid_image_url:
+        # 3.3 แจ้งเตือนผู้ใช้ (Ephemeral) ถ้าลิงก์รูปภาพมีปัญหา และยืนยันการโพสต์
+        success_message = "<a:45696190630e4f208144d0582a0b0414:1423939335928938506> โพสต์ประชาสัมพันธ์สาธารณะสำเร็จแล้ว!"
+        if image_url and not valid_image_url and image_url: 
              success_message += "\n⚠️ ลิงก์รูปภาพไม่ถูกต้อง (ต้องเป็นลิงก์ URL ที่สมบูรณ์) - โพสต์ข้อความหลักโดยไม่มีรูปภาพ"
 
+        # แก้ไขข้อความ Ephemeral แรก
         await interaction.edit_original_response(content=success_message)
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
@@ -230,10 +237,8 @@ class AnnouncementModal(discord.ui.Modal, title='📝 สร้างข้อ�
 
 # 2. สร้าง Slash Command ที่เรียก Modal - พร้อมการตรวจสอบสิทธิ์!
 @bot.tree.command(name="announce", description="📢 สร้างข้อความประชาสัมพันธ์แบบ Embed ด้วยฟอร์มกรอกข้อมูล (จำกัดสิทธิ์)")
-# *** ส่วนสำคัญ: ใช้ Check function ที่กำหนดเอง ***
 @app_commands.check(is_announcer)
 async def announce_command(interaction: discord.Interaction):
-    # แสดง Modal ให้ผู้ใช้กรอกข้อมูล
     await interaction.response.send_modal(AnnouncementModal())
 
 # 3. การจัดการ Error สำหรับ Check Funtion
@@ -245,16 +250,13 @@ async def announce_command_error(interaction: discord.Interaction, error: app_co
             ephemeral=True
         )
     else:
-        # สำหรับ Error อื่นๆ ที่ไม่ใช่ CheckFailure
         print(f"Error in announce_command: {error}")
         await interaction.response.send_message("❌ เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุในการรันคำสั่ง.", ephemeral=True)
 
 
 # --------------------------------------------------------------------------------
-# Slash Command: /session (คงเดิมและไม่ถูกจำกัดสิทธิ์)
+## Slash Command: /session 
 # --------------------------------------------------------------------------------
-
-# ... (โค้ด /session command ทั้งหมดถูกรวมไว้ที่นี่) ...
 
 # --- Class สำหรับ Options ของ /session ---
 class SessionAction(discord.app_commands.Choice):
@@ -279,6 +281,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
 
     # 1. ตรวจสอบ Channel ID
     if interaction.channel_id != DASHBOARD_CHANNEL_ID:
+        # ใช้ Custom Animated Emoji ในข้อความ Ephemeral ได้
         await interaction.response.send_message("<a:809832006988988486:1423939345026388008> คำสั่งนี้ใช้ได้เฉพาะช่อง #live-share-dashboard เท่านั้น", ephemeral=True)
         return
 
@@ -305,14 +308,14 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         await interaction.response.send_message(ephemeral_message, ephemeral=True)
 
         # 2. สร้าง Embed สาธารณะ
-        embed = discord.Embed(title="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! 🚀",
+        embed = discord.Embed(title="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! <a:67c3e29969174247b000f7c7318660f:1423939328928780338>",
                               description="Session สำหรับทำงานร่วมกันได้เริ่มขึ้นแล้ว! กดปุ่มด้านล่างเพื่อเข้าร่วม",
                               color=0x3498db)
         embed.add_field(name="ผู้เริ่ม Session", value=user_name, inline=True)
         embed.add_field(name="เวลาเริ่ม", value=session_data["start_time"], inline=True)
         embed.add_field(name="ผู้เข้าร่วมปัจจุบัน", value=", ".join(session_data["participants"]), inline=False)
         
-        # ใช้ Unicode Emoji 🔗
+        # ใช้ Unicode Emoji 🔗 แทน Custom Animated Emoji ในปุ่มกด
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="🖱️: ̗̀➛ เข้าร่วม Session (LIVE)", url=link, style=discord.ButtonStyle.green)) 
         
@@ -337,7 +340,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ยังไม่มี)", inline=False)
         
-        # ใช้ Unicode Emoji 🔗
+        # ใช้ Unicode Emoji 🔗 แทน Custom Animated Emoji ในปุ่มกด
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="🔗 ลิงก์ Session ปัจจุบัน", url=session_data.get('link','-'), style=discord.ButtonStyle.green))
 
@@ -388,7 +391,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         embed.add_field(name="ระยะเวลา", value=duration_text, inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(current_participants) or "(ไม่มี)", inline=False)
 
-        # ใช้ Unicode Emoji 🔗
+        # ใช้ Unicode Emoji 🔗 แทน Custom Animated Emoji ในปุ่มกด
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="🔗 ลิงก์ Session ที่ผ่านมา", url=current_link, style=discord.ButtonStyle.secondary))
 
@@ -402,6 +405,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
                 if channel_obj:
                     old_message = await channel_obj.fetch_message(current_message_id)
                     old_embed = old_message.embeds[0]
+                    # ใช้ Custom Emoji เดิมใน Title ได้
                     old_embed.title = "<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! (Finished)" 
                     old_embed.description = "Session นี้สิ้นสุดลงแล้ว ดูสรุปด้านล่าง"
                     
@@ -412,6 +416,6 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
 
 
 # --------------------------------------------------------------------------------
-# Run Bot
+## Run Bot
 # --------------------------------------------------------------------------------
 bot.run(TOKEN)
