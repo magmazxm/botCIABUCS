@@ -190,7 +190,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         # *** ปรับปรุง: ข้อความ Ephemeral สำหรับ START (กระชับและไม่มีลิงก์) ***
         # ใช้อิโมจิ: <a:45696190630e4f208144d0582a0b0414:1423939335928938506:>
         ephemeral_message = (
-            f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506:> **Session เริ่มต้นแล้ว!**\n"
+            f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506> **Session เริ่มต้นแล้ว!**\n"
             f"**โฮสต์:** {user_name} (คุณ)\n"
             f"โพสต์แจ้งเตือนสาธารณะถูกส่งในช่องแล้ว"
         )
@@ -249,17 +249,17 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         # *** ปรับปรุง: ข้อความ Ephemeral สำหรับ END (กระชับและไม่มีลิงก์) ***
         # ใช้อิโมจิ: <a:45696190630e4f208144d0582a0b0414:1423939335928938506:>
         ephemeral_message = (
-            f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506:> **Session ถูกปิดแล้ว!**\n"
+            f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506> **Session ถูกปิดแล้ว!**\n"
             f"**ผู้ปิด Session:** {user_name} (คุณ)\n"
             f"โพสต์สรุปถูกส่งในช่องแล้ว"
         )
         await interaction.response.send_message(ephemeral_message, ephemeral=True)
 
         # 3. สร้าง Embed สรุป (ข้อความสาธารณะ - ยังคงแสดงลิงก์)
-        embed = discord.Embed(title="<a:810020134865338368:1423938901671804968:> Live Share Session Ended",
+        embed = discord.Embed(title="<a:810020134865338368:1423938901671804968> Live Share Session Ended",
                               description="Session สิ้นสุดลงแล้ว ขอขอบคุณที่เข้าร่วม!",
                               color=0xe74c3c)
-        embed.add_field(name="Session Link", value=f"[<a:138303skullz:1423938938913165385> ลิงก์ Session ที่ผ่านมา]({session_data.get('link','-')})", inline=False)
+        embed.add_field(name="Session Link", value=f"<a:138303skullz:1423938938913165385>[ลิงก์ Session ที่ผ่านมา]({session_data.get('link','-')})", inline=False)
         embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
         embed.add_field(name="เวลาสิ้นสุด", value=end_time_str, inline=True)
         embed.add_field(name="ระยะเวลา", value=duration_text, inline=True)
