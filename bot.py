@@ -143,7 +143,7 @@ async def on_ready():
 
 
 # --------------------------------------------------------------------------------
-# Slash Command: /session (ส่วนที่ปรับปรุงปุ่มกดและคง Emoji ดั้งเดิม)
+# Slash Command: /session (แก้ไขการตอบกลับให้ถูกต้องตาม Discord API)
 # --------------------------------------------------------------------------------
 
 # --- Class สำหรับ Options ของ /session ---
@@ -169,13 +169,15 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
 
     # 1. ตรวจสอบ Channel ID
     if interaction.channel_id != DASHBOARD_CHANNEL_ID:
+        # ตอบกลับครั้งที่ 1 (Ephemeral) - OK
         await interaction.response.send_message("<a:809832006988988486:1423939345026388008> คำสั่งนี้ใช้ได้เฉพาะช่อง #live-share-dashboard เท่านั้น", ephemeral=True)
         return
 
-    channel = bot.get_channel(DASHBOARD_CHANNEL_ID)
+    # channel = bot.get_channel(DASHBOARD_CHANNEL_ID) # ไม่จำเป็นต้องดึงซ้ำ
 
     if action == "start":
         if not link:
+            # ตอบกลับครั้งที่ 1 (Ephemeral) - OK
             await interaction.response.send_message("<a:809832006988988486:1423939345026388008> โปรดใส่ลิงก์ Live Share เมื่อใช้ /session start", ephemeral=True)
             return
             
@@ -188,7 +190,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         with open("session.json", "w") as f:
             json.dump(session_data, f)
         
-        # *** ข้อความ Ephemeral สำหรับ START (กระชับและไม่มีลิงก์) ***
+        # *** 1. ตอบกลับครั้งที่ 1 (Ephemeral) - ถูกต้อง ***
         ephemeral_message = (
             f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506> **Session เริ่มต้นแล้ว!**\n"
             f"**โฮสต์:** {user_name} (คุณ)\n"
@@ -196,7 +198,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         )
         await interaction.response.send_message(ephemeral_message, ephemeral=True)
 
-        # 3. สร้างและโพสต์ Embed (ข้อความสาธารณะ)
+        # 2. สร้าง Embed สาธารณะ
         embed = discord.Embed(title="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! <a:138303skullz:1423938938913165385>",
                               description="Session สำหรับทำงานร่วมกันได้เริ่มขึ้นแล้ว! กดปุ่มด้านล่างเพื่อเข้าร่วม",
                               color=0x3498db)
@@ -204,12 +206,12 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         embed.add_field(name="เวลาเริ่ม", value=session_data["start_time"], inline=True)
         embed.add_field(name="ผู้เข้าร่วมปัจจุบัน", value=", ".join(session_data["participants"]), inline=False)
         
-        # *** สร้างปุ่มกดสีเขียว (Green Button) ***
+        # สร้างปุ่มกดสีเขียว (Green Button)
         view = discord.ui.View()
-        # เปลี่ยนเป็นสีเขียวตามที่คุณต้องการ
         view.add_item(discord.ui.Button(label="<a:138303skullz:1423938938913165385> เข้าร่วม Session (LIVE)", url=link, style=discord.ButtonStyle.green)) 
         
-        sent_message = await channel.send(embed=embed, view=view)
+        # *** 3. โพสต์ Embed สาธารณะ: ใช้ FOLLOWUP แทน channel.send() ***
+        sent_message = await interaction.followup.send(embed=embed, view=view, wait=True)
         
         # บันทึก ID ของข้อความที่โพสต์ไปเพื่อใช้ในการแก้ไขเมื่อ 'end'
         session_data["last_message_id"] = sent_message.id
@@ -219,25 +221,27 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         
     elif action == "status":
         if not session_data.get("link"):
+            # ตอบกลับครั้งที่ 1 (Ephemeral) - OK
             await interaction.response.send_message("<a:809832006988988486:1423939345026388008> ขณะนี้ไม่มี Live Share Session ที่กำลังทำงานอยู่", ephemeral=True)
             return
 
-        # 1. สร้าง Embed แสดงสถานะ (Ephemeral - ยังคงแสดงลิงก์เพื่อให้ผู้ใช้เช็คได้)
+        # 1. สร้าง Embed แสดงสถานะ 
         embed = discord.Embed(title="<a:1249347622158860308:1422185419491246101> สถานะ Live Share Session ปัจจุบัน",
                               description=f"<a:2a3404eb19f54b10b16e83768f5937ae:1423939322947829841> Session กำลังทำงานอยู่ (จัดการโดยคุณ: {user_name})",
                               color=0xf39c12)
         embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ยังไม่มี)", inline=False)
         
-        # *** สร้างปุ่มกดสีเขียว (Green Button) สำหรับ Status ***
+        # สร้างปุ่มกดสีเขียว (Green Button) สำหรับ Status
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="<a:138303skullz:1423938938913165385> ลิงก์ Session ปัจจุบัน", url=session_data.get('link','-'), style=discord.ButtonStyle.green))
 
-        # 2. ตอบกลับด้วย Embed (Ephemeral)
+        # 2. ตอบกลับด้วย Embed (Ephemeral) - ถูกต้อง
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True) 
 
     elif action == "end":
         if not session_data.get("link"):
+            # ตอบกลับครั้งที่ 1 (Ephemeral) - OK
             await interaction.response.send_message("❌ ไม่มี Live Share Session ที่จะให้ปิด", ephemeral=True)
             return
             
@@ -263,7 +267,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         with open("session.json", "w") as f:
             json.dump(session_data, f)
         
-        # *** ข้อความ Ephemeral สำหรับ END (กระชับและไม่มีลิงก์) ***
+        # *** 3. ตอบกลับครั้งที่ 1 (Ephemeral) - ถูกต้อง ***
         ephemeral_message = (
             f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506> **Session ถูกปิดแล้ว!**\n"
             f"**ผู้ปิด Session:** {user_name} (คุณ)\n"
@@ -271,7 +275,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         )
         await interaction.response.send_message(ephemeral_message, ephemeral=True)
 
-        # 3. สร้าง Embed สรุป (ข้อความสาธารณะ)
+        # 4. สร้าง Embed สรุป (ข้อความสาธารณะ)
         embed = discord.Embed(title="<a:810020134865338368:1423938901671804968> Live Share Session Ended",
                               description="Session สิ้นสุดลงแล้ว ขอขอบคุณที่เข้าร่วม!",
                               color=0xe74c3c)
@@ -280,23 +284,25 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         embed.add_field(name="ระยะเวลา", value=duration_text, inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(current_participants) or "(ไม่มี)", inline=False)
 
-        # *** สร้างปุ่มกดสีเทา (Secondary Button) สำหรับ Session ที่จบแล้ว ***
+        # สร้างปุ่มกดสีเทา (Secondary Button) สำหรับ Session ที่จบแล้ว
         view = discord.ui.View()
-        # เปลี่ยนเป็นสีเทา (Secondary) ตามที่คุณต้องการ
         view.add_item(discord.ui.Button(label="🔗 ลิงก์ Session ที่ผ่านมา", url=current_link, style=discord.ButtonStyle.secondary))
 
-        await channel.send(embed=embed, view=view)
+        # *** 5. โพสต์ Embed สาธารณะ: ใช้ FOLLOWUP แทน channel.send() ***
+        await interaction.followup.send(embed=embed, view=view)
         
-        # 4. ลบปุ่มออกจากข้อความ 'START' เดิม
+        # 6. ลบปุ่มออกจากข้อความ 'START' เดิม
         if current_message_id:
             try:
-                old_message = await channel.fetch_message(current_message_id)
-                old_embed = old_message.embeds[0]
-                old_embed.title = "<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! (Finished)" 
-                old_embed.description = "Session นี้สิ้นสุดลงแล้ว ดูสรุปด้านล่าง"
-                
-                # แก้ไขข้อความเดิมโดยลบปุ่มออก (view=None)
-                await old_message.edit(embed=old_embed, view=None) 
+                channel_obj = bot.get_channel(DASHBOARD_CHANNEL_ID)
+                if channel_obj:
+                    old_message = await channel_obj.fetch_message(current_message_id)
+                    old_embed = old_message.embeds[0]
+                    old_embed.title = "<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! (Finished)" 
+                    old_embed.description = "Session นี้สิ้นสุดลงแล้ว ดูสรุปด้านล่าง"
+                    
+                    # แก้ไขข้อความเดิมโดยลบปุ่มออก (view=None)
+                    await old_message.edit(embed=old_embed, view=None) 
             except discord.NotFound:
                 print(f"Warning: Original START message with ID {current_message_id} not found for editing.")
 
