@@ -202,7 +202,7 @@ class AnnouncementModal(discord.ui.Modal, title='📝 สร้างข้อ�
 
         # 1. สร้าง Embed
         embed = discord.Embed(
-            title=f"<a:torakong:1422185259042078770><a:torakong:1422185259042078770><a:torakong:1422185259042078770>  {title}",
+            title=f"{title}",
             description=description,
             color=discord.Color.blue()
         )
