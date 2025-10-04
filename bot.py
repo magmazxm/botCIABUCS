@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands # นำเข้า app_commands เพื่อใช้ Slash Commands
 import json
 import os
 from dotenv import load_dotenv
@@ -7,7 +8,7 @@ import asyncio
 from aiohttp import web
 import hmac
 import hashlib
-import time # เพิ่มไลบรารี time สำหรับจัดการเวลา
+import time
 
 # โหลด Environment Variables
 load_dotenv()
@@ -18,8 +19,12 @@ GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 
 # การตั้งค่า Bot
 intents = discord.Intents.default()
-intents.message_content = True
-bot = commands.Bot(command_prefix="/", intents=intents)
+intents.message_content = True 
+# เปลี่ยน command_prefix เป็น ! หรือลบออกไปเลย เพราะเราจะใช้ Slash Commands แทน
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# สร้าง Command Tree (จำเป็นสำหรับ Slash Commands)
+bot.tree = app_commands.CommandTree(bot)
 
 # โหลดหรือเริ่มต้นข้อมูล Session จากไฟล์ session.json
 try:
@@ -135,47 +140,80 @@ async def send_dm_only(user, message):
 @bot.event
 async def on_ready():
     print(f'🤖 Logged in as {bot.user} (ID: {bot.user.id})')
+    
+    # *** ส่วนสำคัญ: การลงทะเบียน Slash Commands ***
+    try:
+        synced = await bot.tree.sync() # สั่งให้ Bot ลงทะเบียนคำสั่งทั้งหมดกับ Discord API
+        print(f"✨ Synced {len(synced)} global command(s).")
+    except Exception as e:
+        print(f"❌ Error syncing commands: {e}")
+    # **********************************************
+    
     # เริ่ม Webhook server ให้ทำงานพร้อมกับ Bot
     bot.loop.create_task(start_webhook_server())
 
 
-# -------- Commands: Live Share Session --------
-@bot.command(name="session")
-async def session(ctx, action=None, *, link=None): # ใช้ *, link=None เพื่อรับลิงก์ที่มีช่องว่างได้
-    if ctx.channel.id != DASHBOARD_CHANNEL_ID:
-        await send_dm_only(ctx.author, "❌ คำสั่งนี้ใช้ได้เฉพาะช่อง #live-share-dashboard")
+# --- Class สำหรับ Options ของ /session ---
+# กำหนดทางเลือกที่ผู้ใช้สามารถเลือกได้สำหรับพารามิเตอร์ 'action'
+class SessionAction(discord.app_commands.Choice):
+    def __init__(self, name: str, value: str):
+        super().__init__(name=name, value=value)
+
+# กำหนด Slash Command Group
+@bot.tree.command(name="session", description="จัดการ Live Share Session ในช่องทำงานเป็นทีม")
+@app_commands.describe(
+    action="เลือกคำสั่ง: start, status หรือ end",
+    link="ลิงก์ Live Share (ใช้เฉพาะกับ action: start)",
+)
+@app_commands.choices(action=[
+    SessionAction(name="เริ่ม Live Share Session", value="start"),
+    SessionAction(name="แสดงสถานะ Session ปัจจุบัน", value="status"),
+    SessionAction(name="ปิด Session และคำนวณเวลา", value="end")
+])
+async def session_command(interaction: discord.Interaction, action: str, link: str = None):
+    # **ข้อสำคัญ: ใช้ interaction.channel.id แทน ctx.channel.id**
+    if interaction.channel_id != DASHBOARD_CHANNEL_ID:
+        # ใช้ interaction.response.send_message เพื่อตอบกลับแบบ In-App Reply
+        await interaction.response.send_message("❌ คำสั่งนี้ใช้ได้เฉพาะช่อง #live-share-dashboard เท่านั้น", ephemeral=True)
         return
 
-    channel = bot.get_channel(DASHBOARD_CHANNEL_ID)
+    # **ข้อสำคัญ: ใช้ interaction.response.defer() เพื่อตอบกลับทันที (ถ้าใช้เวลานานกว่า 3 วินาที)**
+    # ในกรณีนี้เราอาจจะตอบกลับเลยโดยไม่ต้อง defer ก็ได้ หรือจะ defer ไว้ก่อนแล้วค่อย follow up
+
+    channel = bot.get_channel(DASHBOARD_CHANNEL_ID) # ยังคงใช้ channel เพื่อส่งข้อความ Embed หลัก
 
     if action == "start":
         if not link:
-            await ctx.send("❌ โปรดใส่ลิงก์ Live Share")
+            await interaction.response.send_message("❌ โปรดใส่ลิงก์ Live Share เมื่อใช้ /session start", ephemeral=True)
             return
             
         # บันทึกข้อมูล
         session_data["link"] = link
-        session_data["participants"] = [ctx.author.display_name] # ให้คนเริ่มเป็น Participant คนแรก
-        session_data["start_time"] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) # ใช้เวลาจริง
+        # **ข้อสำคัญ: ใช้ interaction.user.display_name แทน ctx.author.display_name**
+        session_data["participants"] = [interaction.user.display_name] 
+        session_data["start_time"] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         session_data["end_time"] = None
         with open("session.json", "w") as f:
             json.dump(session_data, f)
         
-        # โพสต์ Embed (ตรวจสอบแล้วว่าโค้ดส่วนนี้ถูกต้อง)
+        # โพสต์ Embed
         embed = discord.Embed(title="💻 VS Code Live Share Session Started!",
                               description="Session สำหรับทำงานร่วมกันได้เริ่มขึ้นแล้ว!",
                               color=0x3498db)
         embed.add_field(name="Session Link", value=f"[🟦 กดตรงนี้เพื่อเข้าร่วม]({link})", inline=False)
-        embed.add_field(name="ผู้เริ่ม Session", value=ctx.author.display_name, inline=True)
+        embed.add_field(name="ผู้เริ่ม Session", value=interaction.user.display_name, inline=True)
         embed.add_field(name="เวลาเริ่ม", value=session_data["start_time"], inline=True)
         embed.add_field(name="ผู้เข้าร่วมปัจจุบัน", value=", ".join(session_data["participants"]), inline=False)
 
+        # เนื่องจากต้องการให้ Embed เป็นข้อความหลักในช่องแชท
+        # เราจะตอบกลับ Slash Command ด้วยข้อความสั้นๆ Ephemeral ก่อน
+        await interaction.response.send_message("✅ เริ่ม Session แล้ว!", ephemeral=True)
+        # แล้วส่ง Embed ตามมาเป็นข้อความปกติ (Follow up)
         await channel.send(embed=embed)
-        await ctx.message.delete() # ลบข้อความคำสั่ง !session start เพื่อความสะอาด
         
     elif action == "status":
         if not session_data.get("link"):
-            await ctx.send("⚠️ ขณะนี้ไม่มี Live Share Session ที่กำลังทำงานอยู่")
+            await interaction.response.send_message("⚠️ ขณะนี้ไม่มี Live Share Session ที่กำลังทำงานอยู่", ephemeral=True)
             return
 
         embed = discord.Embed(title="💻 VS Code Live Share Session Status",
@@ -186,11 +224,12 @@ async def session(ctx, action=None, *, link=None): # ใช้ *, link=None เ�
         embed.add_field(name="สิ้นสุด", value="N/A", inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ยังไม่มี)", inline=False)
         
-        await channel.send(embed=embed)
+        # ตอบกลับด้วย Embed โดยตรง
+        await interaction.response.send_message(embed=embed)
 
     elif action == "end":
         if not session_data.get("link"):
-            await ctx.send("⚠️ ไม่มี Live Share Session ที่จะให้ปิด")
+            await interaction.response.send_message("⚠️ ไม่มี Live Share Session ที่จะให้ปิด", ephemeral=True)
             return
             
         end_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
@@ -216,17 +255,17 @@ async def session(ctx, action=None, *, link=None): # ใช้ *, link=None เ�
         embed.add_field(name="ระยะเวลา", value=duration_text, inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ไม่มี)", inline=False)
         
-        await channel.send(embed=embed)
-        
         # ล้างข้อมูล Session
         session_data.clear()
         with open("session.json", "w") as f:
             json.dump(session_data, f)
-        await ctx.message.delete()
+        
+        # ตอบกลับ Slash Command ด้วยข้อความสั้นๆ Ephemeral ก่อน
+        await interaction.response.send_message("✅ ปิด Session เรียบร้อยแล้ว!", ephemeral=True)
+        # แล้วส่ง Embed ตามมาเป็นข้อความปกติ
+        await channel.send(embed=embed)
 
-    else:
-        # ข้อความแจ้งเตือนคำสั่งที่ไม่ถูกต้อง (ส่งเป็น DM)
-        await send_dm_only(ctx.author, "❌ โปรดใช้คำสั่ง: !session start <link> | !session status | !session end")
 
 # -------- Run Bot --------
-bot.run(TOKEN)
+# bot.run(TOKEN)
+# ข้อควรจำ: โค้ดนี้ถูกแก้ไขเพื่อให้รองรับ Slash Commands และควรจะทำให้คำสั่ง /session ปรากฏขึ้นมาแนะนำ
