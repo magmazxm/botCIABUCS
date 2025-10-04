@@ -19,7 +19,7 @@ GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 # การตั้งค่า Bot
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="/", intents=intents)
 
 # โหลดหรือเริ่มต้นข้อมูล Session จากไฟล์ session.json
 try:
