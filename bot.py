@@ -9,7 +9,9 @@ from aiohttp import web
 import hmac
 import hashlib
 import time
-import urllib.parse # <--- บรรทัดนี้ถูกเพิ่ม
+import urllib.parse
+import datetime # <--- เพิ่ม: สำหรับจัดการ Timezone
+import pytz     # <--- เพิ่ม: สำหรับ Timezone Asia/Bangkok
 
 # โหลด Environment Variables
 load_dotenv()
@@ -84,6 +86,17 @@ async def update_github_embed(payload, bot_client):
 
     except Exception as e:
         print(f"Error processing or sending GitHub embed: {e}")
+
+# --------------------------------------------------------------------------------
+## Timezone Helper Function
+# --------------------------------------------------------------------------------
+
+def get_bkk_time():
+    """ดึงเวลาปัจจุบันในโซนเวลา Asia/Bangkok"""
+    bkk_timezone = pytz.timezone('Asia/Bangkok')
+    now = datetime.datetime.now(bkk_timezone)
+    # ฟอร์แมตเวลาโดยไม่รวม Timezone Info
+    return now.strftime("%Y-%m-%d %H:%M:%S")
 
 # --------------------------------------------------------------------------------
 ## Aiohttp application setup (Webhook Server)
@@ -298,7 +311,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         # 2. บันทึกข้อมูล
         session_data["link"] = link
         session_data["participants"] = [user_name]
-        session_data["start_time"] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        session_data["start_time"] = get_bkk_time() # <--- แก้ไข: ใช้เวลาไทย
         session_data["end_time"] = None
         session_data["last_message_id"] = None
         with open("session.json", "w") as f:
@@ -357,21 +370,38 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
             await interaction.response.send_message("❌ ไม่มี Live Share Session ที่จะให้ปิด", ephemeral=True)
             return
 
-        end_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        end_time_str = get_bkk_time() # <--- แก้ไข: ใช้เวลาไทย
         current_link = session_data.get("link")
         current_message_id = session_data.get("last_message_id")
         current_participants = session_data.get("participants", [])
         current_start_time = session_data.get("start_time", "-")
 
-        # 1. คำนวณระยะเวลา
+        # 1. คำนวณระยะเวลา (แก้ไขให้รองรับ Timezone)
+        duration_text = "-"
         try:
-            start_t = time.mktime(time.strptime(current_start_time, "%Y-%m-%d %H:%M:%S"))
-            end_t = time.mktime(time.strptime(end_time_str, "%Y-%m-%d %H:%M:%S"))
-            duration_sec = end_t - start_t
+            # ใช้ pytz ในการสร้าง objects ที่มี timezone
+            bkk_tz = pytz.timezone('Asia/Bangkok')
+            
+            # โหลดเวลาเริ่มและเวลาสิ้นสุดเป็น datetime object 
+            # (กำหนดให้เป็นเวลาไทย)
+            start_dt = bkk_tz.localize(datetime.datetime.strptime(current_start_time, "%Y-%m-%d %H:%M:%S"))
+            end_dt = bkk_tz.localize(datetime.datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S"))
+            
+            # คำนวณ Delta
+            time_difference = end_dt - start_dt
+            
+            duration_sec = time_difference.total_seconds()
             hours = int(duration_sec // 3600)
             minutes = int((duration_sec % 3600) // 60)
-            duration_text = f"{hours} ชั่วโมง {minutes} นาที"
-        except:
+            
+            # ป้องกันระยะเวลาเป็นลบ (อาจเกิดจากไฟล์ session.json ถูกแก้ไข)
+            if duration_sec < 0:
+                 duration_text = "❌ เวลาเริ่ม/จบ ไม่ถูกต้อง"
+            else:
+                 duration_text = f"{hours} ชั่วโมง {minutes} นาที"
+                 
+        except Exception as e:
+            print(f"Error calculating duration: {e}")
             duration_text = "-"
 
         # 2. ล้างข้อมูล Session
