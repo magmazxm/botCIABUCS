@@ -9,6 +9,7 @@ from aiohttp import web
 import hmac
 import hashlib
 import time
+import urllib.parse # <--- บรรทัดนี้ถูกเพิ่ม
 
 # โหลด Environment Variables
 load_dotenv()
@@ -208,11 +209,15 @@ class AnnouncementModal(discord.ui.Modal, title='📝 สร้างข้อ�
         embed.set_footer(text=f"ประกาศโดย: {interaction.user.display_name}",
                          icon_url=interaction.user.display_avatar.url)
 
-        # 2. ตั้งค่ารูปภาพ (ถ้ามี)
+        # 2. ตั้งค่ารูปภาพ (ถ้ามี) **ส่วนที่แก้ไขตรรกะ URL**
         valid_image_url = False
-        if image_url and image_url.startswith('http') and (image_url.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
-            embed.set_image(url=image_url)
-            valid_image_url = True
+        if image_url and image_url.startswith('http'):
+            # แยก URL ออกจาก Query Parameters (เช่น ?ex=...)
+            parsed_url = urllib.parse.urlparse(image_url)
+            # ใช้ path ในการตรวจสอบว่าลงท้ายด้วยนามสกุลที่ต้องการหรือไม่
+            if parsed_url.path.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                embed.set_image(url=image_url)
+                valid_image_url = True
 
         # 3. การตอบกลับ:
         # 3.1 ตอบกลับ Ephemeral เพื่อแจ้งว่ากำลังประมวลผล (ต้องทำเป็นอันดับแรก)
