@@ -340,11 +340,11 @@ async def announce_command_error(interaction: discord.Interaction, error: app_co
         print(f"Error in announce_command: {error}")
         await interaction.response.send_message("❌ เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุในการรันคำสั่ง.", ephemeral=True)
 
----
+#---
 
 ## Slash Command: /session
 
-```python
+#```python
 # --- Class สำหรับ Options ของ /session ---
 class SessionAction(discord.app_commands.Choice):
     def __init__(self, name: str, value: str):
