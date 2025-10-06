@@ -177,9 +177,10 @@ class AnnouncementModal(discord.ui.Modal, title='📝 สร้างข้อ�
         elif mention_text.isdigit():
             content = f"<@{mention_text}>"
 
-        await interaction.response.send_message("<a:1249347622158860308:1422185419491246101> กำลังโพสต์ประชาสัมพันธ์...", ephemeral=True)
+        await interaction.response.send_message(content="<a:1249347622158860308:1422185419491246101> กำลังโพสต์ประชาสัมพันธ์...", ephemeral=True)
         await interaction.followup.send(content=content, embed=embed)
-        await interaction.edit_original_response("<a:45696190630e4f208144d0582a0b0414:1423939335928938506> โพสต์ประชาสัมพันธ์สำเร็จแล้ว!")
+        await interaction.edit_original_response(content="<a:45696190630e4f208144d0582a0b0414:1423939335928938506> โพสต์ประชาสัมพันธ์สำเร็จแล้ว!")
+
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         await interaction.followup.send(f'❌ เกิดข้อผิดพลาด: {error}', ephemeral=True)
