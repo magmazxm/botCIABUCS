@@ -20,8 +20,10 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 # ************************************************
 # ⚠️ คุณต้องกำหนดค่าเหล่านี้ ⚠️
 # ************************************************
-DASHBOARD_CHANNEL_ID = int(os.getenv("DASHBOARD_CHANNEL_ID"))
-GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
+# ต้องกำหนด CHANNEL ID ที่นี่
+DASHBOARD_CHANNEL_ID = int(os.getenv("DASHBOARD_CHANNEL_ID")) 
+# ต้องกำหนด Secret Key ที่ใช้กับ GitHub Webhook
+GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET") 
 
 # เปลี่ยนตัวเลขเหล่านี้เป็น ID ของบทบาทที่คุณต้องการให้ใช้คำสั่ง /announce ได้
 # ต้องเป็นตัวเลขเท่านั้น คั่นด้วยคอมม่า
@@ -137,7 +139,8 @@ webhook_app.router.add_post("/webhook", handle_webhook)
 # -------- Aiohttp Server Startup Function --------
 async def start_webhook_server():
     """เริ่มต้น Aiohttp server บน PORT ที่กำหนดโดย environment variable"""
-    port = int(os.environ.get("PORT", 5000))
+    # Render จะใช้ PORT จาก Environment Variable
+    port = int(os.environ.get("PORT", 5000)) 
     runner = web.AppRunner(webhook_app)
     await runner.setup()
     site = web.TCPSite(runner, host='0.0.0.0', port=port)
@@ -340,11 +343,10 @@ async def announce_command_error(interaction: discord.Interaction, error: app_co
         print(f"Error in announce_command: {error}")
         await interaction.response.send_message("❌ เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุในการรันคำสั่ง.", ephemeral=True)
 
-#---
-
+# --------------------------------------------------------------------------------
 ## Slash Command: /session
+# --------------------------------------------------------------------------------
 
-#```python
 # --- Class สำหรับ Options ของ /session ---
 class SessionAction(discord.app_commands.Choice):
     def __init__(self, name: str, value: str):
