@@ -177,9 +177,9 @@ class AnnouncementModal(discord.ui.Modal, title='📝 สร้างข้อ�
         elif mention_text.isdigit():
             content = f"<@{mention_text}>"
 
-        await interaction.response.send_message("🚀 กำลังโพสต์ประชาสัมพันธ์...", ephemeral=True)
+        await interaction.response.send_message("<a:1249347622158860308:1422185419491246101> กำลังโพสต์ประชาสัมพันธ์...", ephemeral=True)
         await interaction.followup.send(content=content, embed=embed)
-        await interaction.edit_original_response("✅ โพสต์ประชาสัมพันธ์สำเร็จแล้ว!", ephemeral=True)
+        await interaction.edit_original_response("<a:45696190630e4f208144d0582a0b0414:1423939335928938506> โพสต์ประชาสัมพันธ์สำเร็จแล้ว!")
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         await interaction.followup.send(f'❌ เกิดข้อผิดพลาด: {error}', ephemeral=True)
@@ -227,14 +227,14 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         session_data["last_message_id"] = None
         with open("session.json", "w") as f:
             json.dump(session_data, f)
-        ephemeral_message = f"✅ **Session เริ่มต้นแล้ว!**\nโฮสต์: {user_name}"
+        ephemeral_message = f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506> **Session เริ่มต้นแล้ว!**\nโฮสต์: {user_name}"
         await interaction.response.send_message(ephemeral_message, ephemeral=True)
-        embed = discord.Embed(title="VS Code Live Share Session Started!", description="Session เริ่มขึ้นแล้ว! กดปุ่มเพื่อเข้าร่วม", color=0x3498db)
+        embed = discord.Embed(title="<a:67c3e29969174247b000f7c7318660f:1423939328928780338> VS Code Live Share Session Started! <a:67c3e29969174247b000f7c7318660f:1423939328928780338>", description="Session เริ่มขึ้นแล้ว! กดปุ่มเพื่อเข้าร่วม", color=0x3498db)
         embed.add_field(name="ผู้เริ่ม Session", value=user_name, inline=True)
         embed.add_field(name="เวลาเริ่ม", value=session_data["start_time"], inline=True)
         embed.add_field(name="ผู้เข้าร่วมปัจจุบัน", value=", ".join(session_data["participants"]), inline=False)
         view = discord.ui.View()
-        view.add_item(discord.ui.Button(label="เข้าร่วม Session (LIVE)", url=link, style=discord.ButtonStyle.green))
+        view.add_item(discord.ui.Button(label="🖱️: ̗̀➛ เข้าร่วม Session (LIVE)", url=link, style=discord.ButtonStyle.green))
         sent_message = await interaction.followup.send(embed=embed, view=view, wait=True)
         session_data["last_message_id"] = sent_message.id
         with open("session.json", "w") as f:
@@ -243,11 +243,11 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         if not session_data.get("link"):
             await interaction.response.send_message("❌ ไม่มี Live Share Session ที่กำลังทำงานอยู่", ephemeral=True)
             return
-        embed = discord.Embed(title="สถานะ Live Share Session ปัจจุบัน", description=f"Session กำลังทำงานอยู่ (จัดการโดย {user_name})", color=0xf39c12)
+        embed = discord.Embed(title="<a:1249347622158860308:1422185419491246101> สถานะ Live Share Session ปัจจุบัน", description=f"<a:2a3404eb19f54b10b16e83768f5937ae:1423939322947829841> Session กำลังทำงานอยู่ (จัดการโดย {user_name})", color=0xf39c12)
         embed.add_field(name="เวลาเริ่ม", value=session_data.get("start_time","-"), inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(session_data.get("participants",[])) or "(ยังไม่มี)", inline=False)
         view = discord.ui.View()
-        view.add_item(discord.ui.Button(label="ลิงก์ Session ปัจจุบัน", url=session_data.get('link','-'), style=discord.ButtonStyle.green))
+        view.add_item(discord.ui.Button(label="🔗 ลิงก์ Session ปัจจุบัน", url=session_data.get('link','-'), style=discord.ButtonStyle.green))
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     elif action == "end":
         if not session_data.get("link"):
@@ -275,15 +275,15 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         session_data.clear()
         with open("session.json", "w") as f:
             json.dump(session_data, f)
-        ephemeral_message = f"✅ **Session ถูกปิดแล้ว!**\nผู้ปิด Session: {user_name}"
+        ephemeral_message = f"<a:45696190630e4f208144d0582a0b0414:1423939335928938506> **Session ถูกปิดแล้ว!**\nผู้ปิด Session: {user_name}"
         await interaction.response.send_message(ephemeral_message, ephemeral=True)
-        embed = discord.Embed(title="Live Share Session Ended", description="Session สิ้นสุดลงแล้ว", color=0xe74c3c)
+        embed = discord.Embed(title="<a:810020134865338368:1423938901671804968> Live Share Session Ended", description="Session สิ้นสุดลงแล้ว", color=0xe74c3c)
         embed.add_field(name="เวลาเริ่ม", value=current_start_time, inline=True)
         embed.add_field(name="เวลาสิ้นสุด", value=end_time_str, inline=True)
         embed.add_field(name="ระยะเวลา", value=duration_text, inline=True)
         embed.add_field(name="ผู้เข้าร่วม", value=", ".join(current_participants) or "(ไม่มี)", inline=False)
         view = discord.ui.View()
-        view.add_item(discord.ui.Button(label="ลิงก์ Session ที่ผ่านมา", url=current_link, style=discord.ButtonStyle.secondary))
+        view.add_item(discord.ui.Button(label="🔗 ลิงก์ Session ที่ผ่านมา", url=current_link, style=discord.ButtonStyle.secondary))
         await interaction.followup.send(embed=embed, view=view)
         if current_message_id:
             try:
@@ -291,7 +291,7 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
                 if channel_obj:
                     old_message = await channel_obj.fetch_message(current_message_id)
                     old_embed = old_message.embeds[0]
-                    old_embed.title = "VS Code Live Share Session Started! (Finished)"
+                    old_embed.title = "<a:45696190630e4f208144d0582a0b0414:1423939335928938506> VS Code Live Share Session Started! (Finished)"
                     old_embed.description = "Session นี้สิ้นสุดแล้ว ดูสรุปด้านล่าง"
                     await old_message.edit(embed=old_embed, view=None)
             except discord.NotFound:
