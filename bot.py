@@ -21,9 +21,9 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 # ⚠️ คุณต้องกำหนดค่าเหล่านี้ ⚠️
 # ************************************************
 # ต้องกำหนด CHANNEL ID ที่นี่
-DASHBOARD_CHANNEL_ID = int(os.getenv("DASHBOARD_CHANNEL_ID")) 
+DASHBOARD_CHANNEL_ID = int(os.getenv("DASHBOARD_CHANNEL_ID"))
 # ต้องกำหนด Secret Key ที่ใช้กับ GitHub Webhook
-GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET") 
+GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 
 # เปลี่ยนตัวเลขเหล่านี้เป็น ID ของบทบาทที่คุณต้องการให้ใช้คำสั่ง /announce ได้
 # ต้องเป็นตัวเลขเท่านั้น คั่นด้วยคอมม่า
@@ -34,8 +34,11 @@ ALLOWED_ANNOUNCER_ROLES = [
 # ************************************************
 
 # การตั้งค่า Bot
+# ต้องเปิด Intents ที่จำเป็น (รวมถึง members intent สำหรับการตรวจสอบบทบาท)
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True # **สำคัญ:** สำหรับการดึงบทบาทของผู้ใช้ (user.roles) และการค้นหาบทบาทโดยชื่อ
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # โหลดหรือเริ่มต้นข้อมูล Session
@@ -140,7 +143,7 @@ webhook_app.router.add_post("/webhook", handle_webhook)
 async def start_webhook_server():
     """เริ่มต้น Aiohttp server บน PORT ที่กำหนดโดย environment variable"""
     # Render จะใช้ PORT จาก Environment Variable
-    port = int(os.environ.get("PORT", 5000)) 
+    port = int(os.environ.get("PORT", 5000))
     runner = web.AppRunner(webhook_app)
     await runner.setup()
     site = web.TCPSite(runner, host='0.0.0.0', port=port)
@@ -180,6 +183,7 @@ def is_announcer(interaction: discord.Interaction) -> bool:
 
     # 2. ตรวจสอบว่ามีบทบาทที่กำหนดหรือไม่
     if ALLOWED_ANNOUNCER_ROLES and interaction.guild:
+        # **Note:** การเข้าถึง interaction.user.roles ต้องใช้ members intent!
         user_role_ids = [role.id for role in interaction.user.roles]
         if any(role_id in user_role_ids for role_id in ALLOWED_ANNOUNCER_ROLES):
             return True
@@ -448,22 +452,22 @@ async def session_command(interaction: discord.Interaction, action: str, link: s
         duration_text = "-"
         try:
             bkk_tz = pytz.timezone('Asia/Bangkok')
-            
-            # โหลดเวลาเริ่มและเวลาสิ้นสุดเป็น datetime object 
+
+            # โหลดเวลาเริ่มและเวลาสิ้นสุดเป็น datetime object
             start_dt = bkk_tz.localize(datetime.datetime.strptime(current_start_time, "%Y-%m-%d %H:%M:%S"))
             end_dt = bkk_tz.localize(datetime.datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S"))
-            
+
             time_difference = end_dt - start_dt
-            
+
             duration_sec = time_difference.total_seconds()
             hours = int(duration_sec // 3600)
             minutes = int((duration_sec % 3600) // 60)
-            
+
             if duration_sec < 0:
                  duration_text = "❌ เวลาเริ่ม/จบ ไม่ถูกต้อง"
             else:
                  duration_text = f"{hours} ชั่วโมง {minutes} นาที"
-                 
+
         except Exception as e:
             print(f"Error calculating duration: {e}")
             duration_text = "-"
